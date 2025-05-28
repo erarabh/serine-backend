@@ -6,7 +6,7 @@ export async function chatWithAI(message) {
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      Authorization: `Bearer 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`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
