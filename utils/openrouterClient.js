@@ -1,10 +1,12 @@
 import fetch from 'node-fetch'
 
 export async function chatWithAI(message) {
+  console.log('✅ Using OpenRouter API Key:', process.env.OPENROUTER_API_KEY)
+
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
