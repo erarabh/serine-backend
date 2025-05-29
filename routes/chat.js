@@ -1,5 +1,5 @@
 import express from 'express'
-import { chatWithAI } from '../utils/openrouterClient.js'
+import { chatWithAI } from '../utils/geminiClient.js'
 
 const router = express.Router()
 
