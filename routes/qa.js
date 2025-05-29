@@ -24,32 +24,15 @@ router.get('/:userId', async (req, res) => {
 // POST new Q&A
 router.post('/', async (req, res) => {
   const { userId, question, answer } = req.body
-								  
-					 
-  console.log('📥 POST /qa received:', { userId, question, answer })
+  const { data, error } = await supabase
+    .from('qa_pairs')
+    .insert([{ user_id: userId, question, answer }])
+    .select('id') // 🆕 get the UUID back
 
-  if (!userId || !question || !answer) {
-    console.warn('⚠️ Missing fields in POST /qa')
-    return res.status(400).json({ error: 'Missing userId, question, or answer' })
-  }
-
-  try {
-    const { error } = await supabase
-      .from('qa_pairs')
-      .insert([{ user_id: userId, question, answer }])
-
-    if (error) {
-      console.error('❌ Supabase INSERT error:', error)
-      return res.status(500).json({ error })
-    }
-
-    console.log('✅ Q&A inserted into Supabase')
-    res.json({ success: true })
-  } catch (err) {
-    console.error('❌ Server error in POST /qa:', err)
-    res.status(500).json({ error: 'Internal server error' })
-  }
+  if (error) return res.status(500).json({ error })
+  res.json({ success: true, insertedId: data?.[0]?.id }) // 🆕 return real ID
 })
+
 
 // DELETE Q&A
 router.delete('/:id', async (req, res) => {
