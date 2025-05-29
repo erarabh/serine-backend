@@ -11,22 +11,27 @@ export async function chatWithAI(message) {
     body: JSON.stringify({
       contents: [
         {
+          role: "user",
           parts: [
-            { text: message }
+            {
+              text:
+                "You are Serine, a helpful commercial AI assistant. Always introduce yourself as Serine. You are not Bard."
+            }
           ]
+        },
+        {
+          role: "user",
+          parts: [{ text: message }]
         }
       ]
     })
   })
 
   const data = await res.json()
-
   console.log('🧠 Gemini Raw Response:', JSON.stringify(data, null, 2))
 
-  const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text
-  if (!reply) {
-    console.log('⚠️ Gemini returned no usable message')
-  }
-
-  return reply || 'Sorry, I couldn’t understand.'
+  return (
+    data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+    'Sorry, I couldn’t understand.'
+  )
 }
