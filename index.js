@@ -19,4 +19,4 @@ app.get('/', (_, res) => res.send('Serine backend running'))
 app.listen(process.env.PORT, () => {
   console.log(`🚀 Serine backend listening on port ${process.env.PORT}`)
 })
-console.log('✅ OpenRouter API Key:', process.env.OPENROUTER_API_KEY)
+
