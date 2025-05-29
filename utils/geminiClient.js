@@ -20,10 +20,13 @@ export async function chatWithAI(message) {
   })
 
   const data = await res.json()
-  console.log('🧠 Gemini Response:', JSON.stringify(data, null, 2))
 
-  return (
-    data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-    'Sorry, I couldn’t understand.'
-  )
+  console.log('🧠 Gemini Raw Response:', JSON.stringify(data, null, 2))
+
+  const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text
+  if (!reply) {
+    console.log('⚠️ Gemini returned no usable message')
+  }
+
+  return reply || 'Sorry, I couldn’t understand.'
 }
