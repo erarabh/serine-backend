@@ -5,6 +5,7 @@ import 'dotenv/config'
 import chatRoute from './routes/chat.js'
 import scrapeRoute from './routes/scrape.js'
 import qaRoute from './routes/qa.js'
+import userRoute from './routes/users.js'
 
 const app = express()
 app.use(cors())
@@ -13,6 +14,7 @@ app.use(express.json())
 app.use('/chat', chatRoute)
 app.use('/scrape', scrapeRoute)
 app.use('/qa', qaRoute)
+app.use('/users', userRoute)
 
 app.get('/', (_, res) => res.send('Serine backend running'))
 
