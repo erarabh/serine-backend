@@ -14,7 +14,7 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    // 1. Load Q&A memory
+    // 1. Load all Q&A for the user
     const { data: qaData, error } = await supabase
       .from('qa_pairs')
       .select('question, answer')
@@ -22,12 +22,34 @@ router.post('/', async (req, res) => {
 
     if (error) throw error
 
-    // 2. Match top 5 Q&A (very basic matching)
-    const contextExamples = qaData
-      .filter((qa) => message.toLowerCase().includes(qa.question.toLowerCase().split(' ')[0]))
+    if (!qaData || qaData.length === 0) {
+      return res.json({ reply: "You haven't trained your chatbot yet. Please add some Q&A pairs in your dashboard." })
+    }
+
+    // 2. Naive semantic match — score similarity
+    const scored = qaData.map((qa) => {
+      const question = qa.question.toLowerCase()
+      const input = message.toLowerCase()
+
+      let score = 0
+      if (input === question) score = 10
+      else if (input.includes(question) || question.includes(input)) score = 7
+      else {
+        const qWords = question.split(/\s+/)
+        const mWords = input.split(/\s+/)
+        const overlap = qWords.filter(w => mWords.includes(w))
+        score = overlap.length
+      }
+
+      return { ...qa, score }
+    })
+
+    const topMatches = scored
+      .sort((a, b) => b.score - a.score)
+      .filter(q => q.score > 0)
       .slice(0, 5)
 
-    const contextText = contextExamples.map(
+    const contextText = topMatches.map(
       (q, i) => `Q${i + 1}: ${q.question}\nA${i + 1}: ${q.answer}`
     ).join('\n\n')
 
