@@ -5,7 +5,7 @@ import fetch from 'node-fetch'
 const router = express.Router()
 
 router.post('/', async (req, res) => {
-  const { message, userId } = req.body
+  const { message, userId, lang = 'en' } = req.body // ✅ default to English if not sent
 
   console.log('📥 Chat Request:', { message, userId })
 
@@ -21,7 +21,6 @@ router.post('/', async (req, res) => {
       .eq('user_id', userId)
 
     if (error) throw error
-
     if (!qaData || qaData.length === 0) {
       return res.json({ reply: "You haven't trained your chatbot yet. Please add some Q&A pairs in your dashboard." })
     }
@@ -53,7 +52,7 @@ router.post('/', async (req, res) => {
       (q, i) => `Q${i + 1}: ${q.question}\nA${i + 1}: ${q.answer}`
     ).join('\n\n')
 
-    const prompt = `You are Serine, a helpful AI assistant. Use the following knowledge base to answer the user question:\n\n${contextText}\n\nUser: ${message}`
+    const prompt = `You are a multilingual AI assistant. The user speaks in ${lang}. Answer accordingly.\n\nKnowledge:\n${contextText}\n\nUser: ${message}`
 
     // 3. Call Gemini
     const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
