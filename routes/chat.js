@@ -22,9 +22,10 @@ router.post('/', async (req, res) => {
 
     if (error) throw error
     if (!qaData || qaData.length === 0) {
-      return res.json({ reply: "You haven't trained your chatbot yet. Please add some Q&A pairs in your dashboard." })
-    }
-
+  return res.json({
+    reply: "You haven't trained your chatbot yet. Go to 'My Agents' and add some Q&A pairs or scrape your site."
+  })
+}
     // 2. Naive semantic match — score similarity
     const scored = qaData.map((qa) => {
       const question = qa.question.toLowerCase()
