@@ -1,6 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import 'dotenv/config'
+import agentsRoute from './routes/agents.js'
 
 import chatRoute from './routes/chat.js'
 import scrapeRoute from './routes/scrape.js'
@@ -15,6 +16,7 @@ app.use('/chat', chatRoute)
 app.use('/scrape', scrapeRoute)
 app.use('/qa', qaRoute)
 app.use('/users', userRoute)
+app.use('/agents', agentsRoute)
 
 app.get('/', (_, res) => res.send('Serine backend running'))
 
