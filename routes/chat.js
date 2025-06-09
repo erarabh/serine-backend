@@ -1,6 +1,6 @@
 import express from 'express'
 import { supabase } from '../utils/supabaseAdmin.js'
-import fetch from 'node-fetch'
+import fetch from 'fetch'
 
 const router = express.Router()
 
