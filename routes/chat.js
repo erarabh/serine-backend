@@ -51,7 +51,8 @@ router.post('/', async (req, res) => {
       (q, i) => `Q${i + 1}: ${q.question}\nA${i + 1}: ${q.answer}`
     ).join('\n\n')
 
-    const prompt = `You are Serine, a helpful commercial assistant. The user speaks ${lang}. Use the following Q&A context to answer their question:
+    const prompt = `You are Serine, a helpful commercial assistant. Respond in ${lang === 'ar' ? 'Arabic' : lang === 'fr' ? 'French' : 'English'}.
+Use the following Q&A context to answer the user's question:
 ${contextText}
 
 User: ${message}`
