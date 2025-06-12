@@ -1,35 +1,19 @@
+// ✅ routes/qa.js
 import express from 'express'
 import { supabase } from '../utils/supabaseAdmin.js'
-import fetch from 'node-fetch'
 
 const router = express.Router()
 
-// 👇 Embedding utility (gte-small via Supabase)
+// 👇 Dummy embedText — Gemini doesn't support embeddings
 async function embedText(text) {
-  const response = await fetch('https://api.supabase.com/v1/ai/embed', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
-    },
-    body: JSON.stringify({
-      input: text,
-      model: 'gte-small' // Supabase built-in model
-    })
-  })
-
-  const data = await response.json()
-  if (!data.embedding) {
-    console.error('❌ Embedding failed:', data)
-    throw new Error('Embedding failed')
-  }
-
-  return data.embedding
+  console.warn('⚠️ Skipping embedding — Gemini does not support it.')
+  return null
 }
 
 // ✅ GET all Q&A for user
 router.get('/:userId', async (req, res) => {
   const { userId } = req.params
+
   const { data, error } = await supabase
     .from('qa_pairs')
     .select('*')
@@ -39,7 +23,7 @@ router.get('/:userId', async (req, res) => {
   res.json({ data })
 })
 
-// ✅ POST new Q&A with embeddings
+// ✅ POST new Q&A (no embedding used)
 router.post('/', async (req, res) => {
   const { userId, question, answer } = req.body
   if (!userId || !question || !answer) {
@@ -47,19 +31,16 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    const fullText = `${question} ${answer}`
-    const embedding = await embedText(fullText)
-
     const { data, error } = await supabase
       .from('qa_pairs')
-      .insert([{ user_id: userId, question, answer, embedding }])
+      .insert([{ user_id: userId, question, answer }])
       .select('id')
 
     if (error) throw error
 
     res.json({ success: true, insertedId: data?.[0]?.id })
   } catch (err) {
-    console.error('❌ Insert with embedding failed:', err)
+    console.error('❌ Insert failed:', err)
     res.status(500).json({ error: 'Insert failed' })
   }
 })
