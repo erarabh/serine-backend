@@ -10,30 +10,41 @@ async function embedText(text) {
   return null
 }
 
-// ✅ GET all Q&A for user
+// ✅ GET all Q&A for user (with optional agent)
 router.get('/:userId', async (req, res) => {
   const { userId } = req.params
+  const { agentId } = req.query
+  console.log('🔍 GET QA for user:', userId, 'agent:', agentId)
 
-  const { data, error } = await supabase
-    .from('qa_pairs')
-    .select('*')
-    .eq('user_id', userId)
+										
+  let query = supabase.from('qa_pairs').select('*').eq('user_id', userId)
+  if (agentId) query = query.eq('agent_id', agentId)
+
+  const { data, error } = await query
+  console.log('📦 QAs returned:', data?.length || 0)
 
   if (error) return res.status(500).json({ error })
   res.json({ data })
 })
 
-// ✅ POST new Q&A (no embedding used)
+// ✅ POST new Q&A
 router.post('/', async (req, res) => {
-  const { userId, question, answer } = req.body
+  const { userId, question, answer, agentId } = req.body
   if (!userId || !question || !answer) {
     return res.status(400).json({ error: 'Missing data' })
   }
 
   try {
+    const insertPayload = {
+      user_id: userId,
+      question,
+      answer,
+      agent_id: agentId || null
+    }
+
     const { data, error } = await supabase
       .from('qa_pairs')
-      .insert([{ user_id: userId, question, answer }])
+      .insert([insertPayload])
       .select('id')
 
     if (error) throw error
@@ -45,14 +56,14 @@ router.post('/', async (req, res) => {
   }
 })
 
-// ✅ DELETE Q&A
+// ✅ DELETE Q&A by ID
 router.delete('/:id', async (req, res) => {
   const { id } = req.params
 
-  const { error } = await supabase
-    .from('qa_pairs')
-    .delete()
-    .eq('id', id)
+  const { error } = await supabase.from('qa_pairs').delete().eq('id', id)
+					 
+			 
+				 
 
   if (error) return res.status(500).json({ error })
   res.json({ success: true })
