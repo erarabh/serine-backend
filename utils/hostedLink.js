@@ -26,9 +26,9 @@ export async function createCheckoutLink({ userId, email, name, plan, billing })
           custom: { user_id: userId }
         },
         product_options: {
-          redirect_url: `${process.env.NEXT_PUBLIC_FRONTEND_URL}/dashboard`,
+          redirect_url: `${process.env.FRONTEND_URL}/dashboard`,
           receipt_button_text: 'Go to Dashboard',
-          receipt_link_url: `${process.env.NEXT_PUBLIC_FRONTEND_URL}/dashboard`,
+          receipt_link_url: `${process.env.FRONTEND_URL}/dashboard`,
           receipt_thank_you_note: 'Thanks for joining Serine!'
         },
         expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString()
