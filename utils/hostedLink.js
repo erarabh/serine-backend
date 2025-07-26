@@ -42,6 +42,7 @@ export async function createCheckoutLink({ userId, email, name, plan, billing })
   }
 
   console.log('[hostedLink] creating checkout →', JSON.stringify(payload, null, 2))
+  console.log('[hostedLink] STORE_ID →', STORE_ID)
 
   const res = await fetch('https://api.lemonsqueezy.com/v1/checkouts', {
     method: 'POST',
