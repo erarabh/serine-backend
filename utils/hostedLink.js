@@ -1,19 +1,60 @@
 // backend/utils/hostedLink.js
+import fetch from 'node-fetch'
+import {
+  STORE_ID,
+  API_KEY,
+  VARIANT_IDS
+} from './lemonsqueezy.server.js'
 
 /**
- * Generates a hosted LemonSqueezy buy link with user_id and redirect
- * @param {number|string} variantId - Variant ID from LS_VARIANT_* or VARIANT_MAP
- * @param {string} userId - Supabase user.id
- * @param {string} email - Optional user email (prefill)
- * @param {string} redirectUrl - Where user lands after payment
+ * Create a LemonSqueezy checkout session and return the hosted URL
  */
-export function generateBuyLink(variantId, userId, email, redirectUrl) {
-  const qs = new URLSearchParams({
-    'checkout[custom_data][user_id]': userId,
-    'checkout[redirect_url]': redirectUrl
+export async function createCheckoutLink({ userId, email, name, plan, billing }) {
+  const variantId = VARIANT_IDS[plan]?.[billing]
+  if (!variantId) {
+    throw new Error(`Invalid plan/billing: ${plan}/${billing}`)
+  }
+
+  // Build payload per LS API spec
+  const payload = {
+    data: {
+      type: 'checkouts',
+      attributes: {
+        checkout_data: {
+          email,
+          name,
+          custom: { user_id: userId }
+        },
+        product_options: {
+          redirect_url: `${process.env.NEXT_PUBLIC_FRONTEND_URL}/dashboard`,
+          receipt_button_text: 'Go to Dashboard',
+          receipt_link_url: `${process.env.NEXT_PUBLIC_FRONTEND_URL}/dashboard`,
+          receipt_thank_you_note: 'Thanks for joining Serine!'
+        },
+        expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString()
+      },
+      relationships: {
+        store:   { data: { type: 'stores',   id: STORE_ID } },
+        variant: { data: { type: 'variants', id: variantId } }
+      }
+    }
+  }
+
+  const res = await fetch('https://api.lemonsqueezy.com/v1/checkouts', {
+    method:  'POST',
+    headers: {
+      Authorization: `Bearer ${API_KEY}`,
+      Accept:        'application/vnd.api+json',
+      'Content-Type':'application/vnd.api+json'
+    },
+    body: JSON.stringify(payload)
   })
 
-  if (email) qs.set('checkout[email]', email)
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`LemonSqueezy API error: ${res.status} ${text}`)
+  }
 
-  return `https://serine-ai.lemonsqueezy.com/buy/${variantId}?${qs.toString()}`
+  const { data } = await res.json()
+  return data.attributes.url
 }

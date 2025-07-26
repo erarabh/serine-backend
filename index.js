@@ -1,6 +1,5 @@
-// index.js
 import express from 'express'
-import cors from 'cors'
+import cors    from 'cors'
 import 'dotenv/config'
 
 import agentRoutes           from './routes/agents.js'
@@ -19,62 +18,53 @@ import webhookRouter         from './routes/webhooks.js'
 const app  = express()
 const PORT = process.env.PORT || 3000
 
-// Whitelisted origins for CORS
+// 1) Whitelisted origins
 const ALLOWED_ORIGINS = [
   'http://localhost:3000',
   process.env.NEXT_PUBLIC_FRONTEND_URL    // e.g. https://da8145e1a5df.ngrok-free.app
 ]
 
-// 1) Apply CORS to all incoming requests
+// 2) Global CORS
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (curl, mobile, server-to-server)
       if (!origin) return callback(null, true)
-
       if (ALLOWED_ORIGINS.includes(origin)) {
         return callback(null, true)
       }
-
-      return callback(
-        new Error(`CORS policy: Origin ${origin} not allowed`),
-        false
-      )
+      return callback(new Error(`CORS policy: Origin ${origin} not allowed`), false)
     },
     methods: ['GET','POST','PUT','DELETE','OPTIONS'],
     allowedHeaders: ['Content-Type','Authorization']
   })
 )
 
-// 2) JSON parser for regular routes
+// 3) JSON parser for all non-webhook routes
 app.use(express.json())
 
-// 3) Raw body parser for LemonSqueezy webhooks
+// 4) Raw parser for LemonSqueezy webhooks
 app.use(
   '/webhooks/lemonsqueezy',
   express.raw({ type: 'application/json' }),
   webhookRouter
 )
 
-// 4) Mount application routes
-app.use('/chat',              chatRoute)
-app.use('/scrape',            scrapeRoute)
-app.use('/qa',                qaRoute)
-app.use('/users',             userRoute)
-app.use('/api/chat_metrics',  chatMetricsRouter)
-app.use('/api/chat_sentiments', chatSentimentsRouter)
-app.use('/api/chat',          chatRouter)
-app.use('/api/agents',        agentRoutes)
-app.use('/api/usage',         usageRoute)
-app.use('/feedback',          feedbackRouter)
-app.use('/checkout',          checkoutRouter)
+// 5) Mount your other routes
+app.use('/chat',               chatRoute)
+app.use('/scrape',             scrapeRoute)
+app.use('/qa',                 qaRoute)
+app.use('/users',              userRoute)
+app.use('/api/chat_metrics',   chatMetricsRouter)
+app.use('/api/chat_sentiments',chatSentimentsRouter)
+app.use('/api/agents',         agentRoutes)
+app.use('/api/usage',          usageRoute)
+app.use('/feedback',           feedbackRouter)
+app.use('/checkout',           checkoutRouter)
 
-// 5) Health check endpoint
-app.get('/', (_req, res) => {
-  res.send('Serine AI backend running')
-})
+// 6) Health check
+app.get('/', (_req, res) => res.send('Serine AI backend running'))
 
-// 6) Start the server
+// 7) Start server
 app.listen(PORT, () => {
   console.log(`🚀 Serine backend listening on port ${PORT}`)
 })
