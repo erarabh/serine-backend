@@ -15,7 +15,8 @@ export async function createCheckoutLink({ userId, email, name, plan, billing })
     throw new Error(`Invalid plan/billing: ${plan}/${billing}`)
   }
 
-  // Build payload per LS API spec
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+
   const payload = {
     data: {
       type: 'checkouts',
@@ -31,7 +32,7 @@ export async function createCheckoutLink({ userId, email, name, plan, billing })
           receipt_link_url: `${process.env.FRONTEND_URL}/dashboard`,
           receipt_thank_you_note: 'Thanks for joining Serine!'
         },
-        expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString()
+        expires_at: expiresAt
       },
       relationships: {
         store:   { data: { type: 'stores',   id: STORE_ID } },
@@ -40,21 +41,26 @@ export async function createCheckoutLink({ userId, email, name, plan, billing })
     }
   }
 
+  console.log('[hostedLink] creating checkout →', JSON.stringify(payload, null, 2))
+
   const res = await fetch('https://api.lemonsqueezy.com/v1/checkouts', {
-    method:  'POST',
+    method: 'POST',
     headers: {
       Authorization: `Bearer ${API_KEY}`,
-      Accept:        'application/vnd.api+json',
-      'Content-Type':'application/vnd.api+json'
+      Accept: 'application/vnd.api+json',
+      'Content-Type': 'application/vnd.api+json'
     },
     body: JSON.stringify(payload)
   })
 
+  const text = await res.text()
+  console.log('[hostedLink] response status →', res.status)
+  console.log('[hostedLink] response body →', text)
+
   if (!res.ok) {
-    const text = await res.text()
     throw new Error(`LemonSqueezy API error: ${res.status} ${text}`)
   }
 
-  const { data } = await res.json()
-  return data.attributes.url
+  const { data } = JSON.parse(text)
+  return data?.attributes?.url
 }
