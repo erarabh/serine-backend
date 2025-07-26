@@ -1,5 +1,51 @@
 // backend/routes/checkout.js
 import express from 'express'
+import { generateBuyLink } from '../utils/hostedLink.js'
+
+const router = express.Router()
+
+const BUY_LINKS = {
+  starter: {
+    monthly:  '899349',  // just the variant IDs now
+    yearly:   '899351',
+  },
+  professional: {
+    monthly:  '899352',
+    yearly:   '899353',
+  }
+}
+
+router.post('/', async (req, res) => {
+  console.log('[checkout] Request body:', req.body)
+
+  const { userId, email, name, plan, billing } = req.body
+
+  if (!userId || !email || !name || !plan || !billing) {
+    console.warn('[checkout] Missing fields in body')
+    return res.status(400).json({ error: 'Missing required fields' })
+  }
+
+  const variantId = BUY_LINKS[plan]?.[billing]
+  if (!variantId) {
+    console.warn('[checkout] Invalid plan/billing', plan, billing)
+    return res.status(400).json({ error: 'Invalid plan/billing' })
+  }
+
+  // Build the full URL
+  const redirectUrl = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/dashboard`
+  const url = generateBuyLink(variantId, userId, email, redirectUrl)
+
+  console.log('[checkout] Redirecting user to:', url)
+  res.json({ url })
+})
+
+export default router
+
+
+/*
+
+// backend/routes/checkout.js
+import express from 'express'
 const router = express.Router()
 
 const BUY_LINKS = {
@@ -33,3 +79,6 @@ router.post('/checkout', async (req, res) => {
 })
 
 export default router
+
+
+*/

@@ -12,15 +12,18 @@ import chatMetricsRouter from './routes/chat_metrics.js'
 import chatSentimentsRouter from './routes/chat_sentiments.js'
 import usageRoute from './routes/usage.js'
 import feedbackRouter from './routes/feedback.js'
+import checkoutRouter from './routes/checkout.js'
+import webhookRouter    from './routes/webhooks.js'
 
-// ✅ Correct webhook router import
-import webhookRouter from './routes/webhooks.js'
+
 
 const app = express()
 const PORT = process.env.PORT || 3000
 
-// ✅ CORS middleware
-app.use(cors())
+// 1) CORS for all routes (allows http://localhost:3000)
+app.use(cors({ origin: process.env.NEXT_PUBLIC_FRONTEND_URL }))
+
+
 
 // ✅ JSON parser for regular routes
 app.use(express.json())
@@ -39,9 +42,10 @@ app.use('/api/chat', chatRouter)
 app.use('/api/agents', agentRoutes)
 app.use('/api/usage', usageRoute)
 app.use('/feedback', feedbackRouter)
+app.use('/checkout', checkoutRouter)
 
 // ✅ Health check route
-app.get('/', (_, res) => res.send('Serine backend running'))
+app.get('/', (_, res) => res.send('Serine AI backend running'))
 
 // ✅ Start server
 app.listen(PORT, () => {
