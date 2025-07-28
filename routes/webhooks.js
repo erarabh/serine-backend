@@ -1,3 +1,5 @@
+// ✅ backend/routes/webhooks.js — raw-body and signature verification
+
 import express from 'express'
 import crypto from 'crypto'
 import getRawBody from 'raw-body'
@@ -13,39 +15,36 @@ const supabase = createClient(
 
 const SECRET = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET
 
-router.post('/', async (req, res) => {
-  let rawBody
+router.use(async (req, res, next) => {
   try {
-    rawBody = await getRawBody(req)
+    req.rawBody = await getRawBody(req)
+    next()
   } catch (err) {
     console.error('[webhook] Failed to read raw body:', err)
-    return res.status(400).json({ error: 'Failed to read body' })
+    return res.status(400).send('Cannot read raw body')
   }
+})
 
-  const signature = req.headers['x-signature']
-  const rawString = rawBody.toString()
+router.post('/lemonsqueezy', async (req, res) => {
+  const sig = req.headers['x-signature']
+  const raw = req.rawBody?.toString()
 
   console.log('--- [webhook] Incoming LemonSqueezy Event ---')
-  console.log('[headers] x-signature:', signature)
+  console.log('[headers] x-signature:', sig)
   console.log('[env] webhook secret:', SECRET)
-  console.log('[raw body]', rawString)
+  console.log('[raw body]', raw)
 
-  if (!signature || !SECRET) {
-    console.warn('[webhook] Missing signature or secret ❌')
-    return res.status(400).json({ error: 'Missing signature or secret' })
-  }
-
-  const expected = crypto.createHmac('sha256', SECRET).update(rawString).digest('hex')
+  const expected = crypto.createHmac('sha256', SECRET).update(raw).digest('hex')
   console.log('[signature] expected:', expected)
 
-  if (signature !== expected) {
+  if (sig !== expected) {
     console.warn('[webhook] Invalid signature ❌')
     return res.status(403).json({ error: 'Invalid signature' })
   }
 
   let event
   try {
-    event = JSON.parse(rawString)
+    event = JSON.parse(raw)
   } catch (err) {
     console.error('[webhook] JSON parse error ❌:', err)
     return res.status(400).json({ error: 'Malformed JSON' })
@@ -54,7 +53,6 @@ router.post('/', async (req, res) => {
   const variantId = event?.data?.attributes?.variant_id
   const userId = event?.meta?.custom_data?.user_id
 
-  console.log('[webhook] type:', event?.type)
   console.log('[webhook] variant_id:', variantId)
   console.log('[webhook] user_id:', userId)
 
@@ -64,8 +62,6 @@ router.post('/', async (req, res) => {
   }
 
   const mapping = VARIANT_MAP[variantId]
-  console.log('[variant mapping]', mapping)
-
   if (!mapping) {
     console.warn('[webhook] Unknown variantId ❌:', variantId)
     return res.status(400).json({ error: 'Unknown variantId' })
@@ -92,7 +88,7 @@ router.post('/', async (req, res) => {
     .single()
 
   if (agentErr) {
-    console.error('[webhook] Error fetching agent ❌:', agentErr)
+    console.error('[webhook] Agent fetch error ❌:', agentErr)
   }
 
   if (!agent) {
@@ -101,7 +97,7 @@ router.post('/', async (req, res) => {
       .insert({ user_id: userId, name: 'Default Agent' })
 
     if (insertErr) {
-      console.error('[webhook] Agent creation failed ❌:', insertErr)
+      console.error('[webhook] Agent insert error ❌:', insertErr)
     } else {
       console.log(`[webhook] Created default agent for ${userId} ✅`)
     }
