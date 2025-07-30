@@ -6,11 +6,17 @@ import { createCheckoutLink } from '../utils/hostedLink.js'
 
 const router = express.Router()
 
-// Supabase Admin client for user creation & upsert
-const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// 1) Pull in and validate your Supabase env vars
+const SUPABASE_URL            = process.env.SUPABASE_URL
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  console.error('[startup] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
+  process.exit(1)
+}
+
+// 2) Init your Admin client
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 router.post('/', async (req, res) => {
   const { name, email, password, plan, billing } = req.body
@@ -20,14 +26,14 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    // 1) Check or create Auth user
+    // 3) List or create the Auth user
     const { data: listData } = await supabaseAdmin.auth.admin.listUsers()
     const existing = listData?.users.find(u => u.email === email)
 
     let userId
     if (existing) {
       userId = existing.id
-      console.log('[checkout] Using existing user:', userId)
+      console.log('[checkout] existing user:', userId)
     } else {
       const { data, error: createErr } = await supabaseAdmin.auth.admin.createUser({
         email,
@@ -39,10 +45,10 @@ router.post('/', async (req, res) => {
         throw new Error(createErr?.message || 'Auth creation failed')
       }
       userId = data.user.id
-      console.log('[checkout] Created new user:', userId)
+      console.log('[checkout] created user:', userId)
     }
 
-    // 2) Upsert into public users table
+    // 4) Upsert into your public `users` table
     const { error: upsertErr } = await supabaseAdmin
       .from('users')
       .upsert({
@@ -53,17 +59,14 @@ router.post('/', async (req, res) => {
         plan_period: billing
       }, { onConflict: 'id' })
 
-    if (upsertErr) {
-      throw new Error(upsertErr.message)
-    }
+    if (upsertErr) throw new Error(upsertErr.message)
 
-    // 3) Generate LemonSqueezy link
-    const url = createCheckoutLink({ userId, email, name, plan, billing })
-
+    // 5) Generate your Lemon Squeezy URL
+    const url = await createCheckoutLink({ userId, email, name, plan, billing })
     return res.json({ url })
   } catch (err) {
-    console.error('[checkout] Error:', err.stack || err.message)
-    return res.status(500).json({ error: err.message || 'Internal server error' })
+    console.error('[checkout] fatal error:', err.stack || err.message)
+    return res.status(500).json({ error: err.message || 'Internal error' })
   }
 })
 
