@@ -1,67 +1,53 @@
-// backend/utils/hostedLink.js
+// ✅ backend/utils/hostedLink.js
+
 import fetch from 'node-fetch'
-import {
-  STORE_ID,
-  API_KEY,
-  VARIANT_IDS
-} from './lemonsqueezy.server.js'
 
-/**
- * Create a LemonSqueezy checkout session and return the hosted URL
- */
-export async function createCheckoutLink({ userId, email, name, plan, billing }) {
-  const variantId = VARIANT_IDS[plan]?.[billing]
-  if (!variantId) {
-    throw new Error(`Invalid plan/billing: ${plan}/${billing}`)
+const PRODUCT_VARIANTS = {
+  starter: {
+    monthly: '899349',   // <-- replace with actual variant ID
+    yearly:  '899351'
+  },
+  pro: {
+    monthly: '899352',
+    yearly:  '899353'
   }
+}
 
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+export async function createCheckoutLink({ userId, email, name, plan, billing }) {
+  const variant = PRODUCT_VARIANTS?.[plan]?.[billing]
+
+  if (!variant) {
+    throw new Error(`Variant not found for plan=${plan} billing=${billing}`)
+  }
 
   const payload = {
-    data: {
-      type: 'checkouts',
-      attributes: {
-        checkout_data: {
-          email,
-          name,
-          custom: { user_id: userId }
-        },
-        product_options: {
-          redirect_url: `${process.env.FRONTEND_URL}/dashboard`,
-          receipt_button_text: 'Go to Dashboard',
-          receipt_link_url: `${process.env.FRONTEND_URL}/dashboard`,
-          receipt_thank_you_note: 'Thanks for joining Serine!'
-        },
-        expires_at: expiresAt
-      },
-      relationships: {
-        store:   { data: { type: 'stores',   id: STORE_ID } },
-        variant: { data: { type: 'variants', id: variantId } }
+    checkout_data: {
+      custom_data: {
+        user_id: userId,
+        email,
+        name
       }
-    }
+    },
+    variant_id: variant
   }
 
-  console.log('[hostedLink] creating checkout →', JSON.stringify(payload, null, 2))
-  console.log('[hostedLink] STORE_ID →', STORE_ID)
-
-  const res = await fetch('https://api.lemonsqueezy.com/v1/checkouts', {
+  const res = await fetch('https://api.lemonsqueezy.com/v1/checkout-links', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${API_KEY}`,
-      Accept: 'application/vnd.api+json',
-      'Content-Type': 'application/vnd.api+json'
+      'Authorization': `Bearer ${process.env.LEMONSQUEEZY_API_KEY}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
     },
     body: JSON.stringify(payload)
   })
 
-  const text = await res.text()
-  console.log('[hostedLink] response status →', res.status)
-  console.log('[hostedLink] response body →', text)
+  const json = await res.json()
 
-  if (!res.ok) {
-    throw new Error(`LemonSqueezy API error: ${res.status} ${text}`)
+  if (!res.ok || !json?.data?.url) {
+    console.error('[createCheckoutLink] Error response:', json)
+    throw new Error(json?.error || 'Failed to create checkout link')
   }
 
-  const { data } = JSON.parse(text)
-  return data?.attributes?.url
+  console.log(`[createCheckoutLink] Created for ${email} -> ${json.data.url}`)
+  return json.data.url
 }
