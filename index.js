@@ -17,15 +17,13 @@ import chatSentiments from './routes/chat_sentiments.js'
 import usageRoute     from './routes/usage.js'
 import feedbackRouter from './routes/feedback.js'
 
-// 1) Validate all required env vars up front
+// 1) Validate only truly global env vars
 const requiredEnvs = [
   'SUPABASE_URL',
   'SUPABASE_SERVICE_ROLE_KEY',
   'FRONTEND_URL',
-  'LS_STORE_SLUG',
-  'LS_STORE_ID',
   'LEMON_SQUEEZY_API_KEY',
-  'LEMON_SQUEEZY_WEBHOOK_SECRET'
+  'LEMON_SQUEEZY_WEBHOOK_SECRET',
 ]
 for (const name of requiredEnvs) {
   if (!process.env[name]) {
@@ -34,13 +32,21 @@ for (const name of requiredEnvs) {
   }
 }
 
+// 2) Warn if store slug/ID are unset (checkout will read these)
+if (!process.env.LS_STORE_SLUG) {
+  console.warn('[startup] Warning: LS_STORE_SLUG not set; hosted buy links may break')
+}
+if (!process.env.LS_STORE_ID) {
+  console.warn('[startup] Warning: LS_STORE_ID not set; webhook parsing may skip store check')
+}
+
 const PORT = process.env.PORT || 3000
 const app  = express()
 
-// 2) Configure CORS to allow your frontend only
+// 3) CORS config – allow only your frontend
 const ALLOWED_ORIGINS = [
   'http://localhost:3000',
-  process.env.FRONTEND_URL
+  process.env.FRONTEND_URL,
 ]
 app.use(
   cors({
@@ -54,41 +60,41 @@ app.use(
         false
       )
     },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+    allowedHeaders: ['Content-Type','Authorization'],
   })
 )
 
-// 3) Mount webhooks **before** body-parsing so we can read raw body
+// 4) Webhooks must mount before body-parser
 app.use('/webhooks', webhookRouter)
 
-// 4) Body-parser for everything else
+// 5) JSON parser for everything else
 app.use(express.json())
 
-// 5) Mount your feature routes
+// 6) Feature routes
 app.use('/checkout', checkoutRouter)
-app.use('/chat',     chatRoute)
-app.use('/scrape',   scrapeRoute)
-app.use('/qa',       qaRoute)
-app.use('/users',    userRoute)
+app.use('/chat',          chatRoute)
+app.use('/scrape',        scrapeRoute)
+app.use('/qa',            qaRoute)
+app.use('/users',         userRoute)
 app.use('/api/chat_metrics',    chatMetrics)
 app.use('/api/chat_sentiments', chatSentiments)
 app.use('/api/agents',          agentRoutes)
 app.use('/api/usage',           usageRoute)
 app.use('/feedback',            feedbackRouter)
 
-// 6) Healthcheck
+// 7) Healthcheck
 app.get('/', (_req, res) => {
   res.send('Serine AI backend running 🎉')
 })
 
-// 7) Global error handler (any uncaught errors bubble here)
+// 8) Global error handler
 app.use((err, _req, res, _next) => {
   console.error('[error]', err.stack || err)
   res.status(500).json({ error: err.message || 'Internal Server Error' })
 })
 
-// 8) Start the server
+// 9) Start the server
 app.listen(PORT, () => {
   console.log(`🚀 Serine backend listening on port ${PORT}`)
 })
