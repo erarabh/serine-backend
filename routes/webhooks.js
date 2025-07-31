@@ -1,5 +1,3 @@
-// ✅ backend/routes/webhooks.js — raw-body and signature verification
-
 import express from 'express'
 import crypto from 'crypto'
 import getRawBody from 'raw-body'
@@ -8,103 +6,108 @@ import { createClient } from '@supabase/supabase-js'
 
 const router = express.Router()
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+// 1) Supabase Admin client
+const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  console.error('[startup] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
+  process.exit(1)
+}
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-const SECRET = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET
-
+// 2) Raw-body middleware
 router.use(async (req, res, next) => {
   try {
     req.rawBody = await getRawBody(req)
     next()
   } catch (err) {
-    console.error('[webhook] Failed to read raw body:', err)
-    return res.status(400).send('Cannot read raw body')
+    console.error('[webhooks] Could not read raw body', err)
+    res.status(400).send('Cannot read raw body')
   }
 })
 
 router.post('/lemonsqueezy', async (req, res) => {
-  const sig = req.headers['x-signature']
-  const raw = req.rawBody?.toString()
+  const signatureHeader = req.headers['x-ls-signature']
+  const secret          = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET
+  const rawBody         = req.rawBody?.toString() || ''
 
-  console.log('--- [webhook] Incoming LemonSqueezy Event ---')
-  console.log('[headers] x-signature:', sig)
-  console.log('[env] webhook secret:', SECRET)
-  console.log('[raw body]', raw)
+  console.log('[webhooks] Incoming event, signature:', signatureHeader)
 
-  const expected = crypto.createHmac('sha256', SECRET).update(raw).digest('hex')
-  console.log('[signature] expected:', expected)
+  // 3) Verify signature with timing-safe equal
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(rawBody)
+    .digest('hex')
 
-  if (sig !== expected) {
-    console.warn('[webhook] Invalid signature ❌')
-    return res.status(403).json({ error: 'Invalid signature' })
+  if (
+    typeof signatureHeader !== 'string' ||
+    signatureHeader.length !== expected.length ||
+    !crypto.timingSafeEqual(
+      Buffer.from(signatureHeader, 'hex'),
+      Buffer.from(expected, 'hex')
+    )
+  ) {
+    console.warn('[webhooks] Invalid signature', { expected, signatureHeader })
+    return res.status(401).json({ error: 'Invalid signature' })
   }
 
-  let event
+  let payload
   try {
-    event = JSON.parse(raw)
+    payload = JSON.parse(rawBody)
   } catch (err) {
-    console.error('[webhook] JSON parse error ❌:', err)
+    console.error('[webhooks] JSON parse failed', err)
     return res.status(400).json({ error: 'Malformed JSON' })
   }
 
-  const variantId = event?.data?.attributes?.variant_id
-  const userId = event?.meta?.custom_data?.user_id
+  // 4) Extract metadata
+  const variantId = payload.data?.attributes?.variant_id
+  const userId    = payload.meta?.custom_data?.user_id
 
-  console.log('[webhook] variant_id:', variantId)
-  console.log('[webhook] user_id:', userId)
+  console.log('[webhooks] variantId:', variantId, 'userId:', userId)
 
   if (!variantId || !userId) {
-    console.warn('[webhook] Missing variantId or userId ❌')
     return res.status(400).json({ error: 'Missing variantId or userId' })
   }
 
   const mapping = VARIANT_MAP[variantId]
   if (!mapping) {
-    console.warn('[webhook] Unknown variantId ❌:', variantId)
     return res.status(400).json({ error: 'Unknown variantId' })
   }
 
   const { plan, billing } = mapping
 
-  const { error: userErr } = await supabase
+  // 5) Update profile plan
+  const { error: userErr } = await supabaseAdmin
     .from('users')
-    .update({ plan, period: billing })
+    .update({ plan, plan_period: billing })
     .eq('id', userId)
 
   if (userErr) {
-    console.error('[webhook] Supabase user update error ❌:', userErr)
-    return res.status(500).json({ error: 'Failed to update user' })
-  } else {
-    console.log(`[webhook] Updated user ${userId} → ${plan}/${billing} ✅`)
+    console.error('[webhooks] Failed to update user plan', userErr)
+    return res.status(500).json({ error: userErr.message })
   }
+  console.log(`[webhooks] Updated ${userId} → ${plan}/${billing}`)
 
-  const { data: agent, error: agentErr } = await supabase
+  // 6) Ensure default agent exists
+  const { data: agent, error: agentErr } = await supabaseAdmin
     .from('agents')
     .select('id')
     .eq('user_id', userId)
     .single()
 
-  if (agentErr) {
-    console.error('[webhook] Agent fetch error ❌:', agentErr)
-  }
-
-  if (!agent) {
-    const { error: insertErr } = await supabase
+  if (agentErr && agentErr.code !== 'PGRST116') {
+    console.error('[webhooks] Agent fetch error', agentErr)
+  } else if (!agent) {
+    const { error: insertErr } = await supabaseAdmin
       .from('agents')
       .insert({ user_id: userId, name: 'Default Agent' })
-
     if (insertErr) {
-      console.error('[webhook] Agent insert error ❌:', insertErr)
+      console.error('[webhooks] Agent insert error', insertErr)
     } else {
-      console.log(`[webhook] Created default agent for ${userId} ✅`)
+      console.log('[webhooks] Created default agent')
     }
   }
 
-  console.log(`[webhook] Sync complete for ${userId} ✅`)
-  res.status(200).json({ success: true })
+  return res.json({ success: true })
 })
 
 export default router
