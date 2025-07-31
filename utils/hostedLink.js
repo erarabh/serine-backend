@@ -15,17 +15,18 @@ const LINKS = {
 const STORE_SLUG = process.env.LS_STORE_SLUG || 'serine-ai'
 if (!STORE_SLUG) throw new Error('Missing LS_STORE_SLUG')
 
+// backend/utils/hostedLink.js
+
 export function createCheckoutLink({ userId, email, name, plan, billing }) {
-  const linkId = LINKS[plan]?.[billing]
-  if (!linkId) {
-    throw new Error(`No buy-link for ${plan}/${billing}`)
-  }
+  const linkId = HOSTED_BUY_LINKS[plan][billing]
+  if (!linkId) throw new Error(`No buy-link for ${plan}/${billing}`)
 
   const params = new URLSearchParams({
     'checkout[custom][user_id]': userId,
-    'checkout[email]':           email,
-    'checkout[name]':            name
+    'checkout[email]':            email,
+    'checkout[name]':             name
   })
 
-  return `https://${STORE_SLUG}.lemonsqueezy.com/checkout/${linkId}?${params}`
+  // ← Notice `/buy/` here, not `/checkout/`
+  return `https://${STORE_SLUG}.lemonsqueezy.com/buy/${linkId}?${params}`
 }
