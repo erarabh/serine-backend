@@ -17,7 +17,7 @@ import chatSentiments from './routes/chat_sentiments.js'
 import usageRoute     from './routes/usage.js'
 import feedbackRouter from './routes/feedback.js'
 
-// 1) Validate only truly global env vars
+// 1) Validate essential env vars
 const requiredEnvs = [
   'SUPABASE_URL',
   'SUPABASE_SERVICE_ROLE_KEY',
@@ -32,7 +32,7 @@ for (const name of requiredEnvs) {
   }
 }
 
-// 2) Warn if store slug/ID are unset (checkout will read these)
+// 2) Warn if optional but relevant LemonSqueezy config is missing
 if (!process.env.LS_STORE_SLUG) {
   console.warn('[startup] Warning: LS_STORE_SLUG not set; hosted buy links may break')
 }
@@ -40,10 +40,23 @@ if (!process.env.LS_STORE_ID) {
   console.warn('[startup] Warning: LS_STORE_ID not set; webhook parsing may skip store check')
 }
 
+// 3) Validate variant mapping environment variables
+const variantEnvs = [
+  'LS_VARIANT_MONTHLY_STARTER',
+  'LS_VARIANT_YEARLY_STARTER',
+  'LS_VARIANT_MONTHLY_PROFESSIONAL',
+  'LS_VARIANT_YEARLY_PROFESSIONAL',
+]
+variantEnvs.forEach((key) => {
+  if (!process.env[key]) {
+    console.warn(`[startup] Warning: missing variant env ${key}; webhook plan resolution may fail`)
+  }
+})
+
 const PORT = process.env.PORT || 3000
 const app  = express()
 
-// 3) CORS config – allow only your frontend
+// 4) CORS config – allow only your frontend
 const ALLOWED_ORIGINS = [
   'http://localhost:3000',
   process.env.FRONTEND_URL,
@@ -65,13 +78,13 @@ app.use(
   })
 )
 
-// 4) Webhooks must mount before body-parser
+// 5) Webhooks must mount before body-parser
 app.use('/webhooks', webhookRouter)
 
-// 5) JSON parser for everything else
+// 6) JSON parser for everything else
 app.use(express.json())
 
-// 6) Feature routes
+// 7) Feature routes
 app.use('/checkout', checkoutRouter)
 app.use('/chat',          chatRoute)
 app.use('/scrape',        scrapeRoute)
@@ -83,18 +96,18 @@ app.use('/api/agents',          agentRoutes)
 app.use('/api/usage',           usageRoute)
 app.use('/feedback',            feedbackRouter)
 
-// 7) Healthcheck
+// 8) Healthcheck
 app.get('/', (_req, res) => {
   res.send('Serine AI backend running 🎉')
 })
 
-// 8) Global error handler
+// 9) Global error handler
 app.use((err, _req, res, _next) => {
   console.error('[error]', err.stack || err)
   res.status(500).json({ error: err.message || 'Internal Server Error' })
 })
 
-// 9) Start the server
+// 10) Start the server
 app.listen(PORT, () => {
   console.log(`🚀 Serine backend listening on port ${PORT}`)
 })
