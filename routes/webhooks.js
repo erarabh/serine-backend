@@ -28,15 +28,13 @@ router.use(async (req, res, next) => {
 
 router.post('/lemonsqueezy', async (req, res) => {
   const signature =
-  req.headers['x-hook-signature'] ||     // ✅ LemonSqueezy test mode
-  req.headers['x-signature'] ||          // legacy or proxy relays
-  req.headers['x-ls-signature'] ||       // some older sandbox flows
-  req.headers['x-lemonsqueezy-signature']
+    req.headers['x-hook-signature'] ||
+    req.headers['x-signature'] ||
+    req.headers['x-ls-signature'] ||
+    req.headers['x-lemonsqueezy-signature']
 
-
-  const raw = req.rawBody?.toString() || ''
   const expected = crypto.createHmac('sha256', LEMON_SQUEEZY_WEBHOOK_SECRET)
-                         .update(raw)
+                         .update(req.rawBody) // ✅ use Buffer directly
                          .digest('hex')
 
   console.log('[webhooks] received signature:', signature)
@@ -49,7 +47,7 @@ router.post('/lemonsqueezy', async (req, res) => {
 
   let payload
   try {
-    payload = JSON.parse(raw)
+    payload = JSON.parse(req.rawBody.toString()) // safe after HMAC check
   } catch (err) {
     console.error('[webhooks] JSON parse error:', err)
     return res.status(400).json({ error: 'Malformed JSON' })
