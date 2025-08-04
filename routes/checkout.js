@@ -3,7 +3,6 @@ import { createClient } from '@supabase/supabase-js'
 import { createCheckoutLink } from '../utils/hostedLink.js'
 
 const router = express.Router()
-
 const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -22,46 +21,48 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    const { data: listData } = await supabaseAdmin.auth.admin.listUsers()
-    const existing = listData?.users.find(u => u.email === email)
+    // 1) See if user already exists
+    const { data: listData, error: listErr } = await supabaseAdmin.auth.admin.listUsers()
+    if (listErr) throw listErr
 
+    const existing = listData.users.find(u => u.email === email)
     let userId
+
     if (existing) {
+      // 2a) Reuse existing user — do NOT overwrite their password
       userId = existing.id
       console.log('[checkout] reusing user:', userId)
-
-      const { error: pwErr } = await supabaseAdmin.auth.admin.updateUserById(userId, { password })
-      if (pwErr) {
-        console.error('[checkout] password update failed:', pwErr)
-        throw new Error(pwErr.message)
-      }
-      console.log('[checkout] password updated')
     } else {
-      const { data, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { full_name: name }
-      })
-      if (createErr || !data?.user?.id) {
-        throw new Error(createErr?.message || 'Auth creation failed')
-      }
-      userId = data.user.id
+      // 2b) Create new user with their chosen password, auto-confirm email
+      const { data: created, error: createErr } = 
+        await supabaseAdmin.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          email_confirmed: true,
+          user_metadata: { full_name: name },
+        })
+      if (createErr) throw createErr
+      userId = created.user.id
       console.log('[checkout] created new user:', userId)
     }
 
+    // 3) Upsert into your users table as a free trial
     const { error: upsertErr } = await supabaseAdmin
       .from('users')
-      .upsert({
-        id:          userId,
-        email,
-        name,
-        plan:        'free',
-        plan_period: billing
-      }, { onConflict: 'id' })
+      .upsert(
+        {
+          id:          userId,
+          email,
+          name,
+          plan:        'free',
+          plan_period: billing,
+        },
+        { onConflict: 'id' }
+      )
+    if (upsertErr) throw upsertErr
 
-    if (upsertErr) throw new Error(upsertErr.message)
-
+    // 4) Generate LemonSqueezy checkout link
     const url = createCheckoutLink({ userId, email, name, plan, billing })
     console.log('[checkout] buy link →', url)
     return res.json({ url })
