@@ -5,17 +5,17 @@ import cors from 'cors'
 import 'dotenv/config'
 
 // Import your routers
-import checkoutRouter from './routes/checkout.js'
-import webhookRouter  from './routes/webhooks.js'
-import agentRoutes    from './routes/agents.js'
-import chatRoute      from './routes/chat.js'
-import scrapeRoute    from './routes/scrape.js'
-import qaRoute        from './routes/qa.js'
-import userRoute      from './routes/users.js'
-import chatMetrics    from './routes/chat_metrics.js'
-import chatSentiments from './routes/chat_sentiments.js'
-import usageRoute     from './routes/usage.js'
-import feedbackRouter from './routes/feedback.js'
+import checkoutRouter  from './routes/checkout.js'
+import webhookRouter   from './routes/webhooks.js'
+import agentRoutes     from './routes/agents.js'
+import chatRoute       from './routes/chat.js'
+import scrapeRoute     from './routes/scrape.js'
+import qaRoute         from './routes/qa.js'
+import userRoute       from './routes/users.js'
+import chatMetrics     from './routes/chat_metrics.js'
+import chatSentiments  from './routes/chat_sentiments.js'
+import usageRoute      from './routes/usage.js'
+import feedbackRouter  from './routes/feedback.js'
 
 // 1) Validate essential env vars
 const requiredEnvs = [
@@ -40,7 +40,7 @@ if (!process.env.LS_STORE_ID) {
   console.warn('[startup] Warning: LS_STORE_ID not set; webhook parsing may skip store check')
 }
 
-// 3) Validate variant mapping environment variables
+// 3) Validate variant mapping env vars for your plans
 const variantEnvs = [
   'LS_VARIANT_MONTHLY_STARTER',
   'LS_VARIANT_YEARLY_STARTER',
@@ -49,7 +49,7 @@ const variantEnvs = [
 ]
 variantEnvs.forEach((key) => {
   if (!process.env[key]) {
-    console.warn(`[startup] Warning: missing variant env ${key}; webhook plan resolution may fail`)
+    console.warn(`[startup] Warning: missing variant env ${key}`)
   }
 })
 
@@ -68,33 +68,30 @@ app.use(
       if (ALLOWED_ORIGINS.includes(origin)) {
         return callback(null, true)
       }
-      return callback(
-        new Error(`CORS policy: Origin ${origin} not allowed`),
-        false
-      )
+      return callback(new Error(`CORS policy: Origin ${origin} not allowed`), false)
     },
     methods: ['GET','POST','PUT','DELETE','OPTIONS'],
     allowedHeaders: ['Content-Type','Authorization'],
   })
 )
 
-// 5) Webhooks must mount before body-parser
-app.use('/webhooks', webhookRouter)
+// 5) Webhooks must mount before any body-parser, using raw body
+app.use('/api/webhooks', webhookRouter)
 
-// 6) JSON parser for everything else
+// 6) JSON parser for all other /api routes
 app.use(express.json())
 
-// 7) Feature routes
-app.use('/checkout', checkoutRouter)
-app.use('/chat',          chatRoute)
-app.use('/scrape',        scrapeRoute)
-app.use('/qa',            qaRoute)
-app.use('/users',         userRoute)
-app.use('/api/chat_metrics',    chatMetrics)
-app.use('/api/chat_sentiments', chatSentiments)
-app.use('/api/agents',          agentRoutes)
-app.use('/api/usage',           usageRoute)
-app.use('/feedback',            feedbackRouter)
+// 7) Feature routes, all under /api
+app.use('/api/checkout',       checkoutRouter)
+app.use('/api/chat',           chatRoute)
+app.use('/api/scrape',         scrapeRoute)
+app.use('/api/qa',             qaRoute)
+app.use('/api/users',          userRoute)
+app.use('/api/chat_metrics',   chatMetrics)
+app.use('/api/chat_sentiments',chatSentiments)
+app.use('/api/agents',         agentRoutes)
+app.use('/api/usage',          usageRoute)
+app.use('/api/feedback',       feedbackRouter)
 
 // 8) Healthcheck
 app.get('/', (_req, res) => {
