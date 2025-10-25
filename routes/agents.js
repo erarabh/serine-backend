@@ -4,6 +4,11 @@ import { supabase } from '../utils/supabaseAdmin.js'
 
 const router = express.Router()
 
+							  
+						   
+																			 
+ 
+
 // GET all agents for a user
 router.get('/', async (req, res) => {
   const { userId } = req.query
@@ -14,8 +19,13 @@ router.get('/', async (req, res) => {
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: true })
+			  
+												 
+														 
+   
 
   if (error) return res.status(500).json({ error })
+  console.log(`[agents] Fetched ${data.length} agents for user ${userId}`)
   res.json({ data })
 })
 
@@ -52,6 +62,7 @@ router.post('/', async (req, res) => {
     .select()
     .single()
   if (error) return res.status(500).json({ error })
+  console.log(`[agents] Fetched ${data.length} agents for user ${userId}`)
   res.json({ data })
 })
 
